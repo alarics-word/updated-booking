@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — My Bookings</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div id="nav-ph"></div>
+  <div class="page-wrap">
+    <div class="page-header flex-between">
+      <div><h1>📂 My Bookings</h1><p>Track the status of your facility requests.</p></div>
+      <a href="book.html" class="btn btn-primary">+ New Booking</a>
+    </div>
+
+    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+      <div class="search-bar" style="flex:1;min-width:200px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search" placeholder="Search facility, purpose..." oninput="renderTable()"/>
+      </div>
+      <select id="filter" class="form-select" style="width:auto;" onchange="renderTable()">
+        <option value="">All Status</option>
+        <option value="pending">Pending</option>
+        <option value="inreview">In Review</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </div>
+
+    <div class="card" style="overflow:hidden;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Facility</th><th>Purpose</th><th>Date & Time</th>
+            <th>LED</th><th>Status</th><th>Submitted</th><th></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">No bookings found</div>
+        <div class="empty-sub">Adjust your filters or <a href="book.html" style="color:var(--accent);">submit a new request</a>.</div>
+      </div>
+      <div id="loading" style="padding:3rem;text-align:center;color:var(--text3);">Loading…</div>
+    </div>
+  </div>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal" style="max-width:620px;">
+      <button class="modal-close" onclick="document.getElementById('modal').classList.remove('open')">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, renderNav, initNotifs,
+      getMyBookings, formatDate, formatDateTime, formatTime,
+      statusBadge, stepClass, stepIcon
+    } from './app.js';
+
+    const user = await requireAuth(['student','faculty']);
+    if (!user) throw new Error();
+    document.getElementById('nav-ph').innerHTML = renderNav(user);
+    await initNotifs(user);
+
+    let bookings = [];
+    try {
+      bookings = await getMyBookings(user.id);
+    } catch(e) { console.error(e); }
+
+    document.getElementById('loading').style.display = 'none';
+
+    window.renderTable = () => {
+      const q  = document.getElementById('search').value.toLowerCase();
+      const st = document.getElementById('filter').value;
+      const data = bookings.filter(b => {
+        if (st && b.status !== st) return false;
+        if (q && !`${b.facility} ${b.purpose}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const tbody = document.getElementById('tbody');
+      const empty = document.getElementById('empty');
+      if (!data.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = data.map(b => `
+        <tr>
+          <td>${b.facility}</td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${b.purpose}</td>
+          <td>
+            <div>${formatDate(b.date)}</div>
+            <div style="font-size:.78rem;color:var(--text3);">${formatTime(b.time_start)}–${formatTime(b.time_end)}</div>
+          </td>
+          <td>${b.use_led?'<span style="color:var(--accent3);">✓</span>':'<span style="color:var(--text3);">—</span>'}</td>
+          <td>${statusBadge(b.status)}</td>
+          <td style="font-size:.78rem;color:var(--text3);">${formatDate(b.created_at)}</td>
+          <td><button class="btn btn-sm btn-ghost" onclick="openDetail('${b.id}')">View</button></td>
+        </tr>
+      `).join('');
+    };
+
+    window.openDetail = (id) => {
+      const b = bookings.find(x => x.id === id);
+      if (!b) return;
+      const steps = (b.approval_steps||[]).sort((a,z)=>a.step_order-z.step_order);
+
+      document.getElementById('modal-content').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.5rem;">
+          <h2 style="font-size:1.2rem;">${b.facility}</h2>
+          ${statusBadge(b.status)}
+        </div>
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:1.2rem;">Submitted ${formatDateTime(b.created_at)}</div>
+
+        <div class="grid-2 gap-2" style="margin-bottom:1.5rem;">
+          <div><div class="section-title">Date</div><div style="font-weight:600;">${formatDate(b.date)}</div></div>
+          <div><div class="section-title">Time</div><div style="font-weight:600;">${formatTime(b.time_start)} – ${formatTime(b.time_end)}</div></div>
+          <div style="grid-column:span 2;"><div class="section-title">Purpose</div><div style="font-weight:600;">${b.purpose}</div></div>
+          <div><div class="section-title">Participants</div><div style="font-weight:600;">${b.participants}</div></div>
+          <div><div class="section-title">LED Wall</div><div style="font-weight:600;">${b.use_led?'✓ Yes':'No'}</div></div>
+          ${b.notes?`<div style="grid-column:span 2;"><div class="section-title">Notes</div><div style="color:var(--text2);font-size:.88rem;">${b.notes}</div></div>`:''}
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-title">Approval Progress</div>
+        <div class="approval-steps">
+          ${steps.map((s,i) => `
+            <div class="step-item">
+              <div class="step-circle ${stepClass(s.status)}">${stepIcon(s.status)}</div>
+              <div class="step-content">
+                <div class="step-title">${i+1}. ${s.label}</div>
+                <div class="step-sub">${s.status}${s.acted_at?' · '+formatDateTime(s.acted_at):''}</div>
+                ${s.note?`<div style="margin-top:4px;font-size:.78rem;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--text2);">"${s.note}"</div>`:''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      document.getElementById('modal').classList.add('open');
+    };
+
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal'))
+        document.getElementById('modal').classList.remove('open');
+    });
+
+    renderTable();
+  </script>
+</body>
+</html>

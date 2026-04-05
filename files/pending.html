@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — Account Pending</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+    .pending-card {
+      background:var(--bg2); border:1px solid var(--border);
+      border-radius:var(--radius-lg); padding:3rem 2.5rem;
+      max-width:480px; width:90%; text-align:center;
+      position:relative; overflow:hidden;
+    }
+    .pending-card::before {
+      content:''; position:absolute; top:0; left:0; right:0;
+      height:3px; background:linear-gradient(90deg,var(--accent3),var(--accent));
+    }
+    .pending-icon {
+      font-size:3.5rem; margin-bottom:1.2rem;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform:translateY(0); }
+      50% { transform:translateY(-8px); }
+    }
+    .pending-title { font-family:'Syne',sans-serif; font-size:1.6rem; font-weight:800; margin-bottom:.8rem; }
+    .pending-desc { color:var(--text2); font-size:.9rem; line-height:1.7; margin-bottom:2rem; }
+    .info-box {
+      background:var(--bg3); border:1px solid var(--border);
+      border-radius:var(--radius); padding:1rem 1.2rem;
+      font-size:.85rem; color:var(--text2); margin-bottom:1.5rem; text-align:left;
+    }
+    .info-box strong { color:var(--text); }
+  </style>
+</head>
+<body>
+  <div class="pending-card">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">Account Pending Approval</div>
+    <div class="pending-desc">
+      Your account has been created but requires administrator approval before you can access the system. This is required for <strong>Custodian, Finance, and School President</strong> roles.
+    </div>
+    <div class="info-box">
+      <strong>What happens next?</strong><br/>
+      The School President (admin) will review and approve your account. You'll be able to log in once it's activated. This usually takes 1–2 working days.
+    </div>
+    <div id="profile-info" style="margin-bottom:1.5rem;"></div>
+    <button class="btn btn-ghost" style="width:100%;justify-content:center;" onclick="doLogout()">
+      ← Back to Sign In
+    </button>
+  </div>
+
+  <script type="module">
+    import { supabase, getSessionUser, logout } from './app.js';
+    window.doLogout = logout;
+
+    getSessionUser().then(u => {
+      if (!u) { location.href = 'index.html'; return; }
+      if (u.status === 'active') { location.href = 'dashboard.html'; return; }
+      document.getElementById('profile-info').innerHTML = `
+        <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:var(--radius);padding:.8rem 1rem;font-size:.85rem;text-align:left;">
+          <div style="color:var(--text2);">Logged in as:</div>
+          <div style="font-weight:600;margin-top:4px;">${u.name} &nbsp;<span class="role-badge ${u.role}">${u.role}</span></div>
+          <div style="color:var(--text3);font-size:.78rem;margin-top:2px;">${u.email} · ID: ${u.school_id}</div>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>

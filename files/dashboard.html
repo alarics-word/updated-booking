@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — Dashboard</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div id="nav-ph"></div>
+  <div class="page-wrap">
+    <div id="content">
+      <div style="display:flex;align-items:center;justify-content:center;height:60vh;color:var(--text3);">Loading…</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, renderNav, initNotifs,
+      getMyBookings, getAllBookings, getPendingForApprover,
+      formatDate, formatTime, statusBadge
+    } from './app.js';
+
+    const user = await requireAuth();
+    if (!user) throw new Error();
+
+    document.getElementById('nav-ph').innerHTML = renderNav(user);
+    await initNotifs(user);
+
+    const isBooker   = ['student','faculty'].includes(user.role);
+    const isApprover = ['faculty','custodian','finance','president'].includes(user.role);
+
+    const [myBookings, pendingApprovals, allBookings] = await Promise.all([
+      isBooker   ? getMyBookings(user.id) : Promise.resolve([]),
+      isApprover ? getPendingForApprover(user.role) : Promise.resolve([]),
+      isApprover ? getAllBookings() : Promise.resolve([]),
+    ]);
+
+    const approved = (isBooker ? myBookings : allBookings).filter(b => b.status === 'approved').length;
+    const pending  = (isBooker ? myBookings : allBookings).filter(b => ['pending','inreview'].includes(b.status)).length;
+    const rejected = myBookings.filter(b => b.status === 'rejected').length;
+
+    document.getElementById('content').innerHTML = `
+      <div class="page-header flex-between" style="margin-bottom:2rem;">
+        <div>
+          <h1>Good day, ${user.name.split(' ')[0]} 👋</h1>
+          <p>Here's your overview — <span style="color:var(--text3);font-size:.85rem;">${user.school_id} · ${user.role}</span></p>
+        </div>
+        ${isBooker ? `<a href="book.html" class="btn btn-primary">+ New Booking</a>` : ''}
+      </div>
+
+      <div class="grid-4 mb-3">
+        <div class="card stat-card">
+          <div class="stat-icon blue">📋</div>
+          <div><div class="stat-val">${isBooker ? myBookings.length : allBookings.length}</div>
+          <div class="stat-lbl">${isBooker ? 'My Requests' : 'Total Requests'}</div></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon green">✅</div>
+          <div><div class="stat-val">${approved}</div><div class="stat-lbl">Approved</div></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon amber">⏳</div>
+          <div><div class="stat-val">${pending}</div><div class="stat-lbl">In Progress</div></div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon ${isApprover?'red':'red'}">
+            ${isApprover ? '🔔' : '❌'}
+          </div>
+          <div>
+            <div class="stat-val">${isApprover ? pendingApprovals.length : rejected}</div>
+            <div class="stat-lbl">${isApprover ? 'Needs My Action' : 'Rejected'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2 gap-3">
+        <div>
+          ${isApprover && pendingApprovals.length ? `
+            <div class="section-title">Pending Your Approval</div>
+            <div class="card" style="overflow:hidden;">
+              ${pendingApprovals.slice(0,3).map(s => {
+                const b = s.bookings;
+                const pr = b.profiles;
+                return `
+                  <div style="padding:1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+                    <div>
+                      <div style="font-weight:600;font-size:.9rem;">${b.id.slice(0,8).toUpperCase()}</div>
+                      <div style="font-size:.82rem;color:var(--text2);">${pr?.name} · ${b.facility}</div>
+                      <div style="font-size:.78rem;color:var(--text3);">${formatDate(b.date)} · ${formatTime(b.time_start)}–${formatTime(b.time_end)}</div>
+                    </div>
+                    <a href="approvals.html" class="btn btn-sm btn-primary">Review</a>
+                  </div>
+                `;
+              }).join('')}
+              <div style="padding:.8rem 1.2rem;">
+                <a href="approvals.html" style="font-size:.82rem;color:var(--accent);text-decoration:none;">View all approvals →</a>
+              </div>
+            </div>
+          ` : ''}
+
+          ${isBooker ? `
+            <div class="section-title">My Recent Bookings</div>
+            <div class="card" style="overflow:hidden;">
+              ${!myBookings.length ? `
+                <div class="empty-state"><div class="empty-icon">📋</div>
+                <div class="empty-title">No bookings yet</div>
+                <div class="empty-sub">Submit your first request!</div></div>
+              ` : myBookings.slice(0,4).map(b => `
+                <div style="padding:1rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+                  <div>
+                    <div style="font-weight:600;font-size:.85rem;">${b.facility}</div>
+                    <div style="font-size:.8rem;color:var(--text2);">${formatDate(b.date)}</div>
+                  </div>
+                  ${statusBadge(b.status)}
+                </div>
+              `).join('')}
+              <div style="padding:.8rem 1.2rem;">
+                <a href="my-bookings.html" style="font-size:.82rem;color:var(--accent);text-decoration:none;">View all →</a>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div>
+          <div class="section-title">Approval Workflow</div>
+          <div class="card p-3" style="margin-bottom:1.5rem;">
+            <div class="approval-steps">
+              ${[
+                ['Submit Request',      'Student/Faculty fills booking form.',             null],
+                ['Faculty Approval',    'Required when requester is a student.',           'faculty'],
+                ['Property Custodian',  'Verifies facility availability.',                 'custodian'],
+                ['Finance Office',      'Required only when LED wall is requested.',       'finance'],
+                ['School President',    'Final approval for all bookings.',                'president'],
+              ].map(([title,sub,role],i) => `
+                <div class="step-item">
+                  <div class="step-circle ${role===user.role?'active':'done'}">${i===0?'✓':i}</div>
+                  <div class="step-content">
+                    <div class="step-title">${title}</div>
+                    <div class="step-sub">${sub}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="section-title">Quick Links</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${isBooker   ? `<a href="book.html" class="btn btn-secondary" style="justify-content:center;">📋 New Booking Request</a>` : ''}
+            <a href="calendar.html" class="btn btn-secondary" style="justify-content:center;">📅 Facility Calendar</a>
+            ${isApprover ? `<a href="approvals.html" class="btn btn-secondary" style="justify-content:center;">✅ Pending Approvals</a>` : ''}
+            ${isBooker   ? `<a href="my-bookings.html" class="btn btn-secondary" style="justify-content:center;">📂 My Booking History</a>` : ''}
+            ${user.role==='president' ? `<a href="admin.html" class="btn btn-secondary" style="justify-content:center;">⚙️ Admin Panel</a>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  </script>
+</body>
+</html>

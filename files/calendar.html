@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — Calendar</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div id="nav-ph"></div>
+  <div class="page-wrap">
+    <div class="page-header flex-between">
+      <div><h1>📅 Facility Calendar</h1><p>View all approved and pending bookings.</p></div>
+      <a href="book.html" class="btn btn-primary">+ New Booking</a>
+    </div>
+
+    <!-- LEGEND + FILTER -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--text2);">
+          <span style="width:12px;height:12px;border-radius:3px;background:rgba(59,130,246,.5);display:inline-block;"></span>Alumni Gym
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--text2);">
+          <span style="width:12px;height:12px;border-radius:3px;background:rgba(16,185,129,.5);display:inline-block;"></span>AVR
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--text2);">
+          <span style="width:12px;height:12px;border-radius:3px;background:rgba(245,158,11,.5);display:inline-block;"></span>Pending/Review
+        </div>
+      </div>
+      <select id="filter-fac" class="form-select" style="width:auto;" onchange="renderCal()">
+        <option value="">All Facilities</option>
+        <option value="Alumni Gym">Alumni Gym</option>
+        <option value="Audio Visual Room (AVR)">AVR</option>
+      </select>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="card p-3" style="margin-bottom:1.5rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;">
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">← Prev</button>
+        <div id="cal-title" style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;"></div>
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">Next →</button>
+      </div>
+      <div class="cal-grid" style="margin-bottom:4px;">
+        ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-day-header">${d}</div>`).join('')}
+      </div>
+      <div id="cal-cells" class="cal-grid"></div>
+    </div>
+
+    <!-- UPCOMING + ACTIVE -->
+    <div class="grid-2 gap-3">
+      <div>
+        <div class="section-title">Upcoming Approved Bookings</div>
+        <div id="upcoming" class="card" style="overflow:hidden;">
+          <div style="padding:2rem;text-align:center;color:var(--text3);">Loading…</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Active Requests</div>
+        <div id="active" class="card" style="overflow:hidden;">
+          <div style="padding:2rem;text-align:center;color:var(--text3);">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DAY EVENTS MODAL -->
+  <div class="modal-overlay" id="day-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="document.getElementById('day-modal').classList.remove('open')">✕</button>
+      <div id="day-content"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, renderNav, initNotifs,
+      getAllBookings, formatDate, formatDateTime, formatTime, statusBadge
+    } from './app.js';
+
+    const user = await requireAuth();
+    if (!user) throw new Error();
+    document.getElementById('nav-ph').innerHTML = renderNav(user);
+    await initNotifs(user);
+
+    let allBookings = [];
+    try { allBookings = await getAllBookings(); } catch(e) { console.error(e); }
+
+    let year  = new Date().getFullYear();
+    let month = new Date().getMonth();
+
+    window.changeMonth = (d) => {
+      month += d;
+      if (month > 11) { month=0; year++; }
+      if (month < 0)  { month=11; year--; }
+      renderCal();
+    };
+
+    function fcls(facility, status) {
+      if (['pending','inreview'].includes(status)) return 'led';
+      return facility.includes('Gym') ? 'gym' : 'avr';
+    }
+
+    window.renderCal = () => {
+      const filterFac = document.getElementById('filter-fac').value;
+      const bookings = allBookings.filter(b => {
+        if (b.status === 'rejected') return false;
+        if (filterFac && b.facility !== filterFac) return false;
+        return true;
+      });
+
+      const months = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+      document.getElementById('cal-title').textContent = `${months[month]} ${year}`;
+
+      const firstDay    = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const prevDays    = new Date(year, month, 0).getDate();
+      const today       = new Date();
+      const totalCells  = Math.ceil((firstDay+daysInMonth)/7)*7;
+
+      let cells = '';
+      for (let i=0; i<totalCells; i++) {
+        let day, mo, yr, isOther=false;
+        if (i < firstDay)                 { day=prevDays-firstDay+i+1; mo=month-1; yr=year; isOther=true; }
+        else if (i >= firstDay+daysInMonth){ day=i-firstDay-daysInMonth+1; mo=month+1; yr=year; isOther=true; }
+        else                              { day=i-firstDay+1; mo=month; yr=year; }
+
+        const dateStr = `${yr}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const isToday = day===today.getDate() && mo===today.getMonth() && yr===today.getFullYear();
+        const dayBks  = bookings.filter(b=>b.date===dateStr);
+
+        cells += `
+          <div class="cal-cell ${isToday?'today':''} ${isOther?'other-month':''}" onclick="showDay('${dateStr}')">
+            <div class="cal-date">${day}</div>
+            ${dayBks.slice(0,2).map(b=>`
+              <div class="cal-event ${fcls(b.facility,b.status)}" title="${b.facility}">
+                ${formatTime(b.time_start)} ${b.facility.includes('Gym')?'🏋️':'📺'}
+              </div>
+            `).join('')}
+            ${dayBks.length>2?`<div style="font-size:.65rem;color:var(--text3);">+${dayBks.length-2} more</div>`:''}
+          </div>
+        `;
+      }
+      document.getElementById('cal-cells').innerHTML = cells;
+
+      // Upcoming approved
+      const todayStr = new Date().toISOString().split('T')[0];
+      const upcoming = allBookings.filter(b=>b.status==='approved'&&b.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+      const upEl = document.getElementById('upcoming');
+      if (!upcoming.length) {
+        upEl.innerHTML = '<div class="empty-state" style="padding:1.5rem;"><div class="empty-icon">📅</div><div class="empty-sub">No upcoming approved bookings.</div></div>';
+      } else {
+        upEl.innerHTML = upcoming.map(b=>`
+          <div style="padding:1rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">${b.facility.includes('Gym')?'🏋️':'📺'}</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.88rem;">${b.facility}</div>
+              <div style="font-size:.8rem;color:var(--text2);">${b.purpose}</div>
+              <div style="font-size:.75rem;color:var(--text3);">${formatDate(b.date)} · ${formatTime(b.time_start)}–${formatTime(b.time_end)}</div>
+            </div>
+            <span class="status status-approved">Approved</span>
+          </div>
+        `).join('');
+      }
+
+      // Active requests
+      const active = allBookings.filter(b=>['pending','inreview'].includes(b.status)).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+      const acEl = document.getElementById('active');
+      if (!active.length) {
+        acEl.innerHTML = '<div class="empty-state" style="padding:1.5rem;"><div class="empty-icon">⏳</div><div class="empty-sub">No active requests.</div></div>';
+      } else {
+        acEl.innerHTML = active.map(b=>`
+          <div style="padding:1rem 1.2rem;border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-weight:600;font-size:.88rem;">${b.facility}</span>
+              ${statusBadge(b.status)}
+            </div>
+            <div style="font-size:.8rem;color:var(--text2);">${b.profiles?.name||'—'}</div>
+            <div style="font-size:.75rem;color:var(--text3);">${formatDate(b.date)}</div>
+          </div>
+        `).join('');
+      }
+    };
+
+    window.showDay = (dateStr) => {
+      const bks = allBookings.filter(b=>b.date===dateStr&&b.status!=='rejected');
+      if (!bks.length) return;
+      document.getElementById('day-content').innerHTML = `
+        <h2 style="font-size:1.1rem;margin-bottom:1.2rem;">📅 ${formatDate(dateStr)}</h2>
+        ${bks.map(b=>`
+          <div style="padding:1rem;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.8rem;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-weight:600;">${b.facility}</span>
+              ${statusBadge(b.status)}
+            </div>
+            <div style="font-size:.85rem;color:var(--text2);">👤 ${b.profiles?.name||'—'} (${b.profiles?.school_id||'—'})</div>
+            <div style="font-size:.85rem;color:var(--text2);">⏱ ${formatTime(b.time_start)} – ${formatTime(b.time_end)}</div>
+            <div style="font-size:.85rem;color:var(--text2);">📋 ${b.purpose}</div>
+            <div style="font-size:.85rem;color:var(--text2);">👥 ${b.participants} participants</div>
+            ${b.use_led?'<div style="font-size:.82rem;color:var(--accent3);margin-top:4px;">💡 LED Wall requested</div>':''}
+          </div>
+        `).join('')}
+      `;
+      document.getElementById('day-modal').classList.add('open');
+    };
+
+    document.getElementById('day-modal').addEventListener('click', e => {
+      if (e.target===document.getElementById('day-modal'))
+        document.getElementById('day-modal').classList.remove('open');
+    });
+
+    renderCal();
+  </script>
+</body>
+</html>

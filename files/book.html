@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — New Booking</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div id="nav-ph"></div>
+  <div class="page-wrap">
+    <div class="page-header">
+      <h1>📋 New Booking Request</h1>
+      <p>Fill out the form below to reserve a school facility.</p>
+    </div>
+
+    <div class="grid-2 gap-3" style="align-items:start;">
+      <!-- FORM -->
+      <div class="card p-4">
+        <div id="conflict-warn" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--warning);padding:10px 14px;border-radius:var(--radius);font-size:.85rem;margin-bottom:1rem;">
+          ⚠️ A booking conflict was detected for this time slot. Please choose a different time.
+        </div>
+        <div id="form-err" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--danger);padding:10px 14px;border-radius:var(--radius);font-size:.85rem;margin-bottom:1rem;"></div>
+        <div id="form-suc" style="display:none;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--success);padding:12px 16px;border-radius:var(--radius);font-size:.88rem;margin-bottom:1rem;"></div>
+
+        <div class="form-group">
+          <label class="form-label">Facility <span class="required">*</span></label>
+          <select id="facility" class="form-select" onchange="onFacilityChange()">
+            <option value="">-- Select Facility --</option>
+            <option value="Alumni Gym">🏋️ Alumni Gym</option>
+            <option value="Audio Visual Room (AVR)">📺 Audio Visual Room (AVR)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Purpose / Activity <span class="required">*</span></label>
+          <input id="purpose" type="text" class="form-input" placeholder="e.g. Basketball tournament, Department meeting"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Event Date <span class="required">*</span></label>
+          <input id="date" type="date" class="form-input" onchange="checkConflict()"/>
+        </div>
+
+        <div class="grid-2 gap-2">
+          <div class="form-group">
+            <label class="form-label">Time Start <span class="required">*</span></label>
+            <input id="time-start" type="time" class="form-input" onchange="checkConflict()"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time End <span class="required">*</span></label>
+            <input id="time-end" type="time" class="form-input" onchange="checkConflict()"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Expected Participants <span class="required">*</span></label>
+          <input id="participants" type="number" class="form-input" placeholder="e.g. 50" min="1" max="500"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Additional Notes</label>
+          <textarea id="notes" class="form-textarea" placeholder="Equipment needed, setup instructions, etc."></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="use-led" onchange="updatePreview()" style="width:18px;height:18px;accent-color:var(--accent);"/>
+            <span class="form-label" style="margin-bottom:0;">
+              Will you use the <strong>LED Wall</strong>?
+              <span style="display:block;font-size:.75rem;color:var(--text3);font-weight:400;">Requires Finance Office approval.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="divider"></div>
+        <div style="display:flex;gap:12px;">
+          <button id="submit-btn" class="btn btn-primary btn-lg" style="flex:1;justify-content:center;" onclick="submitBooking()">
+            Submit Request
+          </button>
+          <a href="dashboard.html" class="btn btn-ghost btn-lg">Cancel</a>
+        </div>
+      </div>
+
+      <!-- SIDEBAR -->
+      <div style="display:flex;flex-direction:column;gap:1.5rem;">
+        <div class="card p-3">
+          <div class="section-title">Approval Flow Preview</div>
+          <div id="flow-preview" class="approval-steps"></div>
+        </div>
+
+        <div class="card p-3">
+          <div class="section-title">Facility Info</div>
+          <div id="facility-info"><p style="color:var(--text3);font-size:.85rem;">Select a facility to see details.</p></div>
+        </div>
+
+        <div class="card p-3">
+          <div class="section-title">Booking Guidelines</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${[
+              ['📅','Submit at least 3 days before the event.'],
+              ['🔔','You'll receive notifications at each step.'],
+              ['⚠️','Conflicts are automatically detected.'],
+              ['🧹','Leave the facility clean after use.'],
+            ].map(([i,t])=>`
+              <div style="display:flex;align-items:center;gap:12px;font-size:.85rem;color:var(--text2);">
+                <div style="width:32px;height:32px;border-radius:9px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i}</div>
+                <span>${t}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      requireAuth, renderNav, initNotifs,
+      createBooking, hasConflict, addNotification, showToast
+    } from './app.js';
+
+    const user = await requireAuth(['student','faculty']);
+    if (!user) throw new Error();
+    document.getElementById('nav-ph').innerHTML = renderNav(user);
+    await initNotifs(user);
+
+    document.getElementById('date').min = new Date().toISOString().split('T')[0];
+
+    const facilities = {
+      'Alumni Gym': {
+        icon:'🏋️', capacity:500,
+        desc:'Multi-purpose gym for sports, ceremonies, and large gatherings.',
+        features:['Basketball court','Stage area','LED Wall available','Sound system','Bleachers'],
+      },
+      'Audio Visual Room (AVR)': {
+        icon:'📺', capacity:80,
+        desc:'Fully equipped room for seminars, presentations, and meetings.',
+        features:['Projector & screen','Sound system','Air-conditioned','Theater seating','Whiteboard'],
+      },
+    };
+
+    window.onFacilityChange = () => {
+      const val = document.getElementById('facility').value;
+      const info = facilities[val];
+      const div = document.getElementById('facility-info');
+      if (!info) { div.innerHTML = '<p style="color:var(--text3);font-size:.85rem;">Select a facility to see details.</p>'; return; }
+      div.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.8rem;">
+          <span style="font-size:2rem;">${info.icon}</span>
+          <div><div style="font-weight:600;">${val}</div>
+          <div style="font-size:.8rem;color:var(--text3);">Capacity: ${info.capacity} persons</div></div>
+        </div>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:.8rem;">${info.desc}</p>
+        ${info.features.map(f=>`<div style="font-size:.82rem;color:var(--text2);">✓ ${f}</div>`).join('')}
+      `;
+      checkConflict();
+    };
+
+    window.updatePreview = () => {
+      const led = document.getElementById('use-led').checked;
+      const isFaculty = user.role === 'faculty';
+
+      const steps = [
+        { label:'Faculty Approval',    skip:isFaculty,     note:'Requester is faculty — skipped.' },
+        { label:'Property Custodian',  skip:false },
+        { label:'Finance Office',      skip:!led,          note:'No LED wall — skipped.' },
+        { label:'School President',    skip:false },
+      ];
+
+      document.getElementById('flow-preview').innerHTML = steps.map((s,i) => `
+        <div class="step-item">
+          <div class="step-circle ${s.skip?'done':i===0&&!isFaculty?'active':'pending'}">${s.skip?'✓':i+1}</div>
+          <div class="step-content">
+            <div class="step-title">${s.label}</div>
+            <div class="step-sub" style="${s.skip?'color:var(--text3);':''}">
+              ${s.skip ? (s.note||'Skipped') : 'Pending'}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    };
+
+    window.checkConflict = async () => {
+      const facility  = document.getElementById('facility').value;
+      const date      = document.getElementById('date').value;
+      const timeStart = document.getElementById('time-start').value;
+      const timeEnd   = document.getElementById('time-end').value;
+      const warn = document.getElementById('conflict-warn');
+      if (!facility || !date || !timeStart || !timeEnd) { warn.style.display='none'; return; }
+      const conflict = await hasConflict(facility, date, timeStart, timeEnd);
+      warn.style.display = conflict ? 'block' : 'none';
+    };
+
+    window.submitBooking = async () => {
+      const facility    = document.getElementById('facility').value;
+      const purpose     = document.getElementById('purpose').value.trim();
+      const date        = document.getElementById('date').value;
+      const timeStart   = document.getElementById('time-start').value;
+      const timeEnd     = document.getElementById('time-end').value;
+      const participants = parseInt(document.getElementById('participants').value);
+      const notes       = document.getElementById('notes').value.trim();
+      const useLED      = document.getElementById('use-led').checked;
+
+      const errEl = document.getElementById('form-err');
+      errEl.style.display = 'none';
+
+      if (!facility||!purpose||!date||!timeStart||!timeEnd||!participants) {
+        errEl.textContent = 'Please fill in all required fields.'; errEl.style.display='block'; return;
+      }
+      if (timeStart >= timeEnd) {
+        errEl.textContent = 'End time must be after start time.'; errEl.style.display='block'; return;
+      }
+      if (await hasConflict(facility, date, timeStart, timeEnd)) {
+        errEl.textContent = 'Scheduling conflict detected. Please choose a different time.'; errEl.style.display='block'; return;
+      }
+
+      const btn = document.getElementById('submit-btn');
+      btn.textContent = 'Submitting…'; btn.disabled = true;
+
+      const isFaculty = user.role === 'faculty';
+
+      const bookingRow = {
+        user_id: user.id, facility, purpose, date,
+        time_start: timeStart, time_end: timeEnd,
+        participants, notes, use_led: useLED,
+        status: 'pending', current_step: isFaculty ? 1 : 0,
+      };
+
+      const steps = [
+        { step_order:0, label:'Faculty Approval',   status: isFaculty?'skipped':'pending', note: isFaculty?'Requester is faculty.':null },
+        { step_order:1, label:'Property Custodian', status:'pending' },
+        { step_order:2, label:'Finance Office',     status: useLED?'pending':'skipped', note: useLED?null:'No LED wall required.' },
+        { step_order:3, label:'School President',   status:'pending' },
+      ];
+
+      try {
+        const booking = await createBooking(bookingRow, steps);
+        await addNotification(user.id, `Your booking for ${facility} on ${date} has been submitted.`);
+
+        const suc = document.getElementById('form-suc');
+        suc.textContent = `✅ Booking submitted! Redirecting to your bookings…`;
+        suc.style.display = 'block';
+        showToast('Booking submitted!', 'success');
+        setTimeout(() => location.href = 'my-bookings.html', 1800);
+      } catch(e) {
+        errEl.textContent = 'Error submitting booking: ' + e.message;
+        errEl.style.display = 'block';
+        btn.textContent = 'Submit Request'; btn.disabled = false;
+      }
+    };
+
+    updatePreview();
+  </script>
+</body>
+</html>

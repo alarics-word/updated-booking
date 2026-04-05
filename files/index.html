@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SchoolBook — Sign In</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    body { display:flex; min-height:100vh; }
+
+    .auth-left {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      padding:3rem; position:relative;
+    }
+    .auth-left-inner { max-width:460px; animation: fadeUp .7s ease; }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .brand-logo {
+      display:flex; align-items:center; gap:12px; margin-bottom:2.5rem;
+    }
+    .brand-icon {
+      width:52px; height:52px; border-radius:14px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.6rem; box-shadow:0 0 30px rgba(59,130,246,.4);
+    }
+    .brand-name { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; }
+    .brand-name span { color:var(--accent); }
+
+    .hero-title {
+      font-family:'Syne',sans-serif; font-size:2.4rem;
+      font-weight:800; line-height:1.15; margin-bottom:1rem;
+    }
+    .hero-title .hl {
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    .hero-desc { color:var(--text2); font-size:.92rem; line-height:1.7; margin-bottom:2rem; }
+
+    .feature-item {
+      display:flex; align-items:center; gap:12px;
+      font-size:.86rem; color:var(--text2); margin-bottom:10px;
+    }
+    .feature-icon {
+      width:32px; height:32px; border-radius:9px;
+      background:var(--surface); border:1px solid var(--border);
+      display:flex; align-items:center; justify-content:center; font-size:.95rem; flex-shrink:0;
+    }
+
+    /* RIGHT PANEL */
+    .auth-right {
+      width:460px; background:var(--bg2);
+      border-left:1px solid var(--border);
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; padding:2.5rem 2rem;
+      position:relative; overflow-y:auto;
+    }
+    .auth-right::before {
+      content:''; position:absolute; top:0; left:0; right:0;
+      height:3px; background:linear-gradient(90deg,var(--accent),var(--accent2));
+    }
+
+    .tab-row {
+      display:flex; gap:6px; background:var(--bg3);
+      border:1px solid var(--border); border-radius:10px;
+      padding:4px; margin-bottom:1.8rem; width:100%;
+    }
+    .tab-btn {
+      flex:1; padding:8px; border:none; border-radius:7px;
+      font-family:'DM Sans',sans-serif; font-size:.88rem; font-weight:500;
+      cursor:pointer; transition:all .2s;
+      background:transparent; color:var(--text2);
+    }
+    .tab-btn.active { background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(59,130,246,.4); }
+
+    .form-panel { width:100%; }
+    .form-panel.hidden { display:none; }
+
+    .form-title { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; margin-bottom:.3rem; }
+    .form-sub { font-size:.85rem; color:var(--text2); margin-bottom:1.4rem; }
+
+    /* ROLE CARDS */
+    .role-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:1.2rem;
+    }
+    .role-card {
+      border:2px solid var(--border); border-radius:10px;
+      padding:10px 12px; cursor:pointer; transition:all .2s;
+      background:var(--bg3); position:relative;
+    }
+    .role-card:hover { border-color:var(--accent); background:var(--surface); }
+    .role-card.selected { border-color:var(--accent); background:rgba(59,130,246,.08); }
+    .role-card.selected::after {
+      content:'✓'; position:absolute; top:6px; right:8px;
+      color:var(--accent); font-size:.8rem; font-weight:700;
+    }
+    .role-card input[type=radio] { display:none; }
+    .role-emoji { font-size:1.3rem; margin-bottom:4px; }
+    .role-lbl { font-size:.8rem; font-weight:600; color:var(--text); }
+    .role-desc { font-size:.68rem; color:var(--text3); margin-top:2px; line-height:1.3; }
+
+    .restricted-note {
+      font-size:.75rem; color:var(--text3);
+      background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.2);
+      border-radius:8px; padding:8px 10px; margin-bottom:1rem;
+      display:none;
+    }
+    .restricted-note.show { display:block; }
+
+    .err {
+      background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3);
+      color:var(--danger); padding:10px 14px; border-radius:var(--radius);
+      font-size:.83rem; margin-bottom:1rem; display:none;
+    }
+    .suc {
+      background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3);
+      color:var(--success); padding:10px 14px; border-radius:var(--radius);
+      font-size:.83rem; margin-bottom:1rem; display:none;
+    }
+
+    @media(max-width:860px){
+      .auth-left { display:none; }
+      .auth-right { width:100%; border-left:none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- LEFT -->
+  <div class="auth-left">
+    <div class="auth-left-inner">
+      <div class="brand-logo">
+        <div class="brand-icon">🏫</div>
+        <div class="brand-name">School<span>Book</span></div>
+      </div>
+      <div class="hero-title">
+        Book school facilities<br>the <span class="hl">right way.</span>
+      </div>
+      <div class="hero-desc">
+        The official online booking and reservation system for school facilities — Alumni Gym and Audio Visual Room. No more paper forms, no more waiting in line.
+      </div>
+      <div class="feature-item"><div class="feature-icon">📋</div><span>Submit requests online anytime, anywhere</span></div>
+      <div class="feature-item"><div class="feature-icon">✅</div><span>Automated multi-level approval workflow</span></div>
+      <div class="feature-item"><div class="feature-icon">📅</div><span>Real-time schedule conflict detection</span></div>
+      <div class="feature-item"><div class="feature-icon">🔔</div><span>Live notifications at every approval step</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="auth-right">
+
+    <!-- TABS -->
+    <div class="tab-row" style="max-width:380px;">
+      <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <!-- ── LOGIN ── -->
+    <div class="form-panel" id="panel-login" style="max-width:380px;">
+      <div class="form-title">Welcome back 👋</div>
+      <div class="form-sub">Sign in with your school account.</div>
+      <div class="err" id="login-err"></div>
+
+      <div class="form-group">
+        <label class="form-label">School Email</label>
+        <input id="l-email" type="email" class="form-input" placeholder="you@school.edu"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input id="l-pass" type="password" class="form-input" placeholder="••••••••"/>
+      </div>
+
+      <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:.4rem;" onclick="doLogin()">
+        Sign In →
+      </button>
+      <div style="text-align:center;margin-top:1rem;font-size:.8rem;color:var(--text3);">
+        Don't have an account? <a onclick="switchTab('signup')" style="color:var(--accent);cursor:pointer;">Create one</a>
+      </div>
+    </div>
+
+    <!-- ── SIGN UP ── -->
+    <div class="form-panel hidden" id="panel-signup" style="max-width:380px;">
+      <div class="form-title">Create Account</div>
+      <div class="form-sub">Register with your school credentials.</div>
+      <div class="err" id="signup-err"></div>
+      <div class="suc" id="signup-suc"></div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name <span class="required">*</span></label>
+        <input id="s-name" type="text" class="form-input" placeholder="e.g. Maria Santos"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Student / Employee ID <span class="required">*</span></label>
+        <input id="s-id" type="text" class="form-input" placeholder="e.g. 2024-00123"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">School Email <span class="required">*</span></label>
+        <input id="s-email" type="email" class="form-input" placeholder="you@school.edu"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password <span class="required">*</span></label>
+        <input id="s-pass" type="password" class="form-input" placeholder="At least 8 characters"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password <span class="required">*</span></label>
+        <input id="s-pass2" type="password" class="form-input" placeholder="Repeat password"/>
+      </div>
+
+      <div class="form-group" style="margin-bottom:.6rem;">
+        <label class="form-label">Role <span class="required">*</span></label>
+        <div class="role-grid">
+          <label class="role-card" onclick="selectRole(this,'student')">
+            <input type="radio" name="role" value="student"/>
+            <div class="role-emoji">🎓</div>
+            <div class="role-lbl">Student</div>
+            <div class="role-desc">Submit booking requests for events</div>
+          </label>
+          <label class="role-card" onclick="selectRole(this,'faculty')">
+            <input type="radio" name="role" value="faculty"/>
+            <div class="role-emoji">👨‍🏫</div>
+            <div class="role-lbl">Faculty</div>
+            <div class="role-desc">Book & approve student requests</div>
+          </label>
+          <label class="role-card" onclick="selectRole(this,'custodian')">
+            <input type="radio" name="role" value="custodian"/>
+            <div class="role-emoji">🏢</div>
+            <div class="role-lbl">Custodian</div>
+            <div class="role-desc">Property & facility approver</div>
+          </label>
+          <label class="role-card" onclick="selectRole(this,'finance')">
+            <input type="radio" name="role" value="finance"/>
+            <div class="role-emoji">💰</div>
+            <div class="role-lbl">Finance</div>
+            <div class="role-desc">Approves LED wall usage</div>
+          </label>
+          <label class="role-card" style="grid-column:span 2;" onclick="selectRole(this,'president')">
+            <input type="radio" name="role" value="president"/>
+            <div class="role-emoji">🎖️</div>
+            <div class="role-lbl">School President</div>
+            <div class="role-desc">Final approver for all bookings</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="restricted-note" id="restricted-note">
+        ⚠️ <strong>Custodian, Finance, and School President</strong> accounts require admin approval before you can log in. You'll be notified once approved.
+      </div>
+
+      <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;" onclick="doSignup()">
+        Create Account →
+      </button>
+      <div style="text-align:center;margin-top:1rem;font-size:.8rem;color:var(--text3);">
+        Already have an account? <a onclick="switchTab('login')" style="color:var(--accent);cursor:pointer;">Sign in</a>
+      </div>
+    </div>
+
+    <div style="margin-top:2rem;font-size:.75rem;color:var(--text3);text-align:center;">
+      SchoolBook · Online Booking &amp; Reservation System
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase, getSessionUser, showToast } from './app.js';
+
+    // Redirect if already logged in
+    getSessionUser().then(u => {
+      if (!u) return;
+      if (u.status === 'pending') location.href = 'pending.html';
+      else location.href = 'dashboard.html';
+    });
+
+    let selectedRole = '';
+
+    window.switchTab = (tab) => {
+      document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='signup')));
+      document.getElementById('panel-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('panel-signup').classList.toggle('hidden', tab !== 'signup');
+    };
+
+    window.selectRole = (el, role) => {
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      el.querySelector('input').checked = true;
+      selectedRole = role;
+      const restricted = ['custodian','finance','president'].includes(role);
+      document.getElementById('restricted-note').classList.toggle('show', restricted);
+    };
+
+    function showErr(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg; el.style.display = 'block';
+    }
+    function hideErr(id) { document.getElementById(id).style.display = 'none'; }
+
+    window.doLogin = async () => {
+      hideErr('login-err');
+      const email = document.getElementById('l-email').value.trim();
+      const pass  = document.getElementById('l-pass').value;
+      if (!email || !pass) { showErr('login-err','Please fill in all fields.'); return; }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) { showErr('login-err', error.message); return; }
+
+      const user = await getSessionUser();
+      if (!user) { showErr('login-err','Account not found. Please sign up.'); return; }
+      if (user.status === 'pending') { location.href = 'pending.html'; return; }
+      if (user.status === 'rejected') { showErr('login-err','Your account has been rejected. Contact the administrator.'); return; }
+      location.href = 'dashboard.html';
+    };
+
+    window.doSignup = async () => {
+      hideErr('signup-err');
+      document.getElementById('signup-suc').style.display = 'none';
+
+      const name  = document.getElementById('s-name').value.trim();
+      const sid   = document.getElementById('s-id').value.trim();
+      const email = document.getElementById('s-email').value.trim();
+      const pass  = document.getElementById('s-pass').value;
+      const pass2 = document.getElementById('s-pass2').value;
+
+      if (!name || !sid || !email || !pass || !pass2 || !selectedRole) {
+        showErr('signup-err','Please fill in all fields and select a role.'); return;
+      }
+      if (pass.length < 8) { showErr('signup-err','Password must be at least 8 characters.'); return; }
+      if (pass !== pass2)  { showErr('signup-err','Passwords do not match.'); return; }
+
+      const restricted = ['custodian','finance','president'].includes(selectedRole);
+      const status = restricted ? 'pending' : 'active';
+
+      // 1. Create Supabase auth user
+      const { data: authData, error: authErr } = await supabase.auth.signUp({ email, password: pass });
+      if (authErr) { showErr('signup-err', authErr.message); return; }
+
+      // 2. Insert profile row
+      const { error: profErr } = await supabase.from('profiles').insert({
+        id:        authData.user.id,
+        name,
+        school_id: sid,
+        email,
+        role:      selectedRole,
+        status,
+      });
+      if (profErr) { showErr('signup-err', profErr.message); return; }
+
+      if (restricted) {
+        const suc = document.getElementById('signup-suc');
+        suc.textContent = '✅ Account created! Your account is pending admin approval. You will be notified once activated.';
+        suc.style.display = 'block';
+        // Sign them out — they shouldn't be logged in while pending
+        await supabase.auth.signOut();
+      } else {
+        location.href = 'dashboard.html';
+      }
+    };
+
+    // Enter key
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const loginHidden = document.getElementById('panel-login').classList.contains('hidden');
+      loginHidden ? window.doSignup() : window.doLogin();
+    });
+  </script>
+</body>
+</html>
